@@ -35,14 +35,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Form parsing failed' });
     }
 
-    const name = fields.fullName?.[0] || fields.name?.[0] || 'No name';
-    const email = fields.email?.[0] || 'No email';
-    const phone = fields.phone?.[0] || 'No phone';
-    const message = (fields.queryDescription?.[0] || fields.message?.[0] || '').replace(/\n/g, '<br/>');
+    const nameRaw = fields.fullName ?? fields.name ?? 'No name';
+    const phoneRaw = fields.phone ?? 'No phone';
+    const messageRaw = fields.queryDescription ?? fields.message ?? '';
 
-    const carMake = fields.carMake?.[0];
-    const carModel = fields.carModel?.[0];
-    const carReg = fields.carReg?.[0];
+    // Handle name, phone, message: can be string or array
+    const name = Array.isArray(nameRaw) ? nameRaw[0] : nameRaw;
+    const phone = Array.isArray(phoneRaw) ? phoneRaw[0] : phoneRaw;
+    const message = (Array.isArray(messageRaw) ? messageRaw[0] : messageRaw).replace(/\n/g, '<br/>');
+
+    // Extract email robustly
+    let emailRaw = fields.email ?? 'No email';
+    let email = '';
+    if (Array.isArray(emailRaw)) {
+      email = emailRaw[0];
+    } else if (typeof emailRaw === 'string') {
+      email = emailRaw;
+    }
+    email = email.trim();
+
+    // Basic email format check
+    const isValidEmail = email && /\S+@\S+\.\S+/.test(email);
+
+    const carMakeRaw = fields.carMake;
+    const carModelRaw = fields.carModel;
+    const carRegRaw = fields.carReg;
+
+    const carMake = Array.isArray(carMakeRaw) ? carMakeRaw[0] : carMakeRaw;
+    const carModel = Array.isArray(carModelRaw) ? carModelRaw[0] : carModelRaw;
+    const carReg = Array.isArray(carRegRaw) ? carRegRaw[0] : carRegRaw;
+
     const isQuote = carMake || carModel || carReg;
 
     // Handle file attachments
@@ -77,20 +99,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <p><strong>Message:</strong><br/>${message}</p>
       `;
 
-    const { error } = await resend.emails.send({
-      from: isQuote ? 'Quote Form <no-reply@goburley.com>' : 'Contact Form <no-reply@goburley.com>',
-      to: ['george@goburley.com'],
-      subject,
-      replyTo: email,
-      html,
-      attachments,
-    });
+    try {
+      const sendOptions: any = {
+        from: isQuote ? 'Quote Form <no-reply@goburley.com>' : 'Contact Form <no-reply@goburley.com>',
+        to: ['george@goburley.com'],
+        subject,
+        html,
+        attachments,
+      };
 
-    if (error) {
-      console.error('Resend error:', error);
-      return res.status(500).json({ success: false, error: 'Failed to send email' });
+      if (isValidEmail) {
+        sendOptions.replyTo = email;
+      }
+
+      const { error } = await resend.emails.send(sendOptions);
+
+      if (error) {
+        console.error('Resend error:', error);
+        return res.status(500).json({ success: false, error: 'Failed to send email' });
+      }
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      return res.status(500).json({ success: false, error: 'Unexpected error occurred' });
     }
-
-    return res.status(200).json({ success: true });
   });
 }
