@@ -35,16 +35,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Form parsing failed' });
     }
 
+    // Normalize fields to strings
     const nameRaw = fields.fullName ?? fields.name ?? 'No name';
     const phoneRaw = fields.phone ?? 'No phone';
     const messageRaw = fields.queryDescription ?? fields.message ?? '';
 
-    // Handle name, phone, message: can be string or array
     const name = Array.isArray(nameRaw) ? nameRaw[0] : nameRaw;
     const phone = Array.isArray(phoneRaw) ? phoneRaw[0] : phoneRaw;
     const message = (Array.isArray(messageRaw) ? messageRaw[0] : messageRaw).replace(/\n/g, '<br/>');
 
-    // Extract email robustly
+    // Normalize and validate email
     let emailRaw = fields.email ?? 'No email';
     let email = '';
     if (Array.isArray(emailRaw)) {
@@ -54,9 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     email = email.trim();
 
-    // Basic email format check
     const isValidEmail = email && /\S+@\S+\.\S+/.test(email);
 
+    // Normalize car fields
     const carMakeRaw = fields.carMake;
     const carModelRaw = fields.carModel;
     const carRegRaw = fields.carReg;
@@ -67,21 +67,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const isQuote = carMake || carModel || carReg;
 
-    // Handle file attachments
-    const attachments =
-      files.images instanceof Array
-        ? await Promise.all(
-            files.images.map(async (file: formidable.File) => {
-              const contentBuffer = fs.readFileSync(file.filepath);
-              return {
-                filename: file.originalFilename || 'upload',
-                content: contentBuffer.toString('base64'), // base64 string
-                contentType: file.mimetype || 'application/octet-stream', 
-                encoding: 'base64', // tell resend it's base64 encoded
-              };
-            })
-          )
-        : [];
+    // Handle file attachments (single or multiple)
+    const attachments: {
+      filename: string;
+      content: Buffer;
+      contentType: string;
+    }[] = [];
+
+    const uploaded = files.images;
+
+    if (Array.isArray(uploaded)) {
+      for (const file of uploaded) {
+        const f = file as formidable.File;
+        attachments.push({
+          filename: f.originalFilename || 'upload',
+          content: fs.readFileSync(f.filepath),
+          contentType: f.mimetype || 'application/octet-stream',
+        });
+      }
+    } else if (uploaded) {
+      const f = uploaded as formidable.File;
+      attachments.push({
+        filename: f.originalFilename || 'upload',
+        content: fs.readFileSync(f.filepath),
+        contentType: f.mimetype || 'application/octet-stream',
+      });
+    }
 
     const subject = isQuote
       ? `New Quote Request from ${name}`
