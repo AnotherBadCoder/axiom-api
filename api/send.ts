@@ -71,10 +71,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const attachments =
       files.images instanceof Array
         ? await Promise.all(
-            files.images.map(async (file: formidable.File) => ({
-              filename: file.originalFilename || 'upload',
-              content: fs.readFileSync(file.filepath),
-            }))
+            files.images.map(async (file: formidable.File) => {
+              const contentBuffer = fs.readFileSync(file.filepath);
+              return {
+                filename: file.originalFilename || 'upload',
+                content: contentBuffer.toString('base64'), // base64 string
+                contentType: file.mimetype || 'application/octet-stream', 
+                encoding: 'base64', // tell resend it's base64 encoded
+              };
+            })
           )
         : [];
 
