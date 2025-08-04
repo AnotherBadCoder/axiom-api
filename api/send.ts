@@ -35,6 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Form parsing failed' });
     }
 
+    console.log('Parsed form fields:', fields);
+    console.log('Parsed form files:', files);
     // Normalize fields to strings
     const nameRaw = fields.fullName ?? fields.name ?? 'No name';
     const phoneRaw = fields.phone ?? 'No phone';
@@ -79,6 +81,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (Array.isArray(uploaded)) {
       for (const file of uploaded) {
         const f = file as formidable.File;
+        console.log('Processing uploaded file:', {
+          name: f.originalFilename,
+          path: f.filepath,
+          mimetype: f.mimetype,
+        });
+
         attachments.push({
           filename: f.originalFilename || 'upload',
           content: fs.readFileSync(f.filepath),
@@ -87,6 +95,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     } else if (uploaded) {
       const f = uploaded as formidable.File;
+      console.log('Processing single uploaded file:', {
+        name: f.originalFilename,
+        path: f.filepath,
+        mimetype: f.mimetype,
+      });
+
       attachments.push({
         filename: f.originalFilename || 'upload',
         content: fs.readFileSync(f.filepath),
@@ -129,6 +143,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const { error } = await resend.emails.send(sendOptions);
+
+      console.log('Final email payload:', {
+        to: sendOptions.to,
+        from: sendOptions.from,
+        subject: sendOptions.subject,
+        html: sendOptions.html,
+        attachments: attachments.map((a) => ({
+          filename: a.filename,
+          contentType: a.contentType,
+          size: a.content.length,
+        })),
+      });
+
 
       if (error) {
         console.error('Resend error:', error);
