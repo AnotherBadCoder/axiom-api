@@ -1,5 +1,3 @@
-// api/send.ts
-
 import { Resend } from 'resend';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import formidable from 'formidable';
@@ -8,20 +6,30 @@ import fs from 'fs';
 export const config = {
   api: {
     bodyParser: false, // Required for file uploads
+    externalResolver: true,
   },
 };
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS headers to allow requests from any origin
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle OPTIONS preflight request
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).send('Method Not Allowed');
   }
 
   const form = formidable({ multiples: true });
-  
-  form.parse(req, async (err: any, fields: formidable.Fields, files: formidable.Files) => {
 
+  form.parse(req, async (err: any, fields: formidable.Fields, files: formidable.Files) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Form parsing failed' });
@@ -42,7 +50,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       files.images instanceof Array
         ? await Promise.all(
             files.images.map(async (file: formidable.File) => ({
-
               filename: file.originalFilename || 'upload',
               content: fs.readFileSync(file.filepath),
             }))
