@@ -132,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       const sendOptions: any = {
         from: isQuote ? 'New Quote Request <no-reply@axiomrepair.co.uk>' : 'Contact Form Request <no-reply@axiomrepair.co.uk>',
-        to: ['website@axiomrepair.co.uk'],
+        to: ['p.kaszubski@axiomrepair.co.uk'],
         subject,
         html,
         attachments,
